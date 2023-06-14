@@ -73,7 +73,14 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 			if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
 				continue
 			}
-			if vm.Status.Phase != "Running" {
+			var ready bool
+			for _, cond := range vm.Status.Conditions {
+				if cond.Type == "Ready" && cond.Status == "True" {
+					ready = true
+					break
+				}
+			}
+			if !ready {
 				continue
 			}
 		case <-timeout.Done():
