@@ -12,6 +12,6 @@ RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg \
     go build -trimpath -ldflags='-extldflags=-static -w -s -X main.version='"$VERSION" -o /out/gitlab-runner-kubevirt .
 
-FROM gitlab/gitlab-runner:${GITLAB_RUNNER_VERSION}
+FROM gitlab/gitlab-runner:alpine-${GITLAB_RUNNER_VERSION}
 
 COPY --from=build /out/gitlab-runner-kubevirt /bin/gitlab-runner-kubevirt
