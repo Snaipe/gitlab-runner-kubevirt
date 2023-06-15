@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	kubevirt "kubevirt.io/client-go/kubecli"
@@ -16,12 +17,24 @@ import (
 
 type CleanupCmd struct {
 	Timeout time.Duration `name:"timeout" default:"1h"`
+	SkipIf  []string      `name:"skip-if" sep:","`
 }
 
 func (cmd *CleanupCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) error {
 	vm, err := FindJobVM(ctx, client, jctx)
 	if err != nil {
 		return err
+	}
+
+	for _, skipIf := range cmd.SkipIf {
+		check := func() bool { return string(vm.Status.Phase) == skipIf }
+		if strings.HasPrefix(skipIf, "!") {
+			check = func() bool { return string(vm.Status.Phase) != skipIf[1:] }
+		}
+		if check() {
+			fmt.Fprintf(os.Stderr, "Skipping cleanup of Virtual Machine instance %v because of --skip-if=%v\n", vm.ObjectMeta.Name, skipIf)
+			return nil
+		}
 	}
 
 	watch, err := client.VirtualMachineInstance(jctx.Namespace).Watch(ctx, *Selector(jctx))
