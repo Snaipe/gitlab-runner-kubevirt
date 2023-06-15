@@ -3,8 +3,12 @@ module snai.pe/gitlab-runner-kubevirt
 go 1.17
 
 require (
+	barney.ci/shutil v0.1.0
 	github.com/alecthomas/kong v0.7.1
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/helloyi/go-sshclient v1.2.0
+	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d
+	golang.org/x/text v0.3.7
 	k8s.io/api v0.23.5
 	k8s.io/apimachinery v0.23.5
 	k8s.io/client-go v12.0.0+incompatible
@@ -13,8 +17,6 @@ require (
 )
 
 require (
-	barney.ci/shutil v0.1.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect
@@ -44,12 +46,10 @@ require (
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d // indirect
 	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b // indirect
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
 	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
-	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
