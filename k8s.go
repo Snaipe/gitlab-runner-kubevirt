@@ -119,6 +119,7 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 						ContainerDisk: &kubevirtapi.ContainerDiskSource{
 							Image:           jctx.Image,
 							ImagePullPolicy: k8sapi.PullPolicy(jctx.ImagePullPolicy),
+							ImagePullSecret: jctx.ImagePullSecret,
 						},
 					},
 				},

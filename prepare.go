@@ -17,6 +17,8 @@ import (
 
 type PrepareCmd struct {
 	DefaultImage                   string        `name:"default-image"`
+	DefaultImagePullPolicy         string        `name:"default-image-pull-policy"`
+	DefaultImagePullSecret         string        `name:"default-image-pull-secret"`
 	DefaultCPURequest              string        `name:"default-cpu-request" default:"1"`
 	DefaultCPULimit                string        `name:"default-cpu-limit" default:"1"`
 	DefaultMemoryRequest           string        `name:"default-memory-request" default:"1Gi"`
@@ -44,6 +46,12 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	}
 	if jctx.EphemeralStorageLimit == "" {
 		jctx.EphemeralStorageLimit = cmd.DefaultEphemeralStorageLimit
+	}
+	if jctx.ImagePullPolicy == "" {
+		jctx.ImagePullPolicy = cmd.DefaultImagePullPolicy
+	}
+	if jctx.ImagePullSecret == "" {
+		jctx.ImagePullSecret = cmd.DefaultImagePullSecret
 	}
 	if jctx.Image == "" {
 		jctx.Image = cmd.DefaultImage

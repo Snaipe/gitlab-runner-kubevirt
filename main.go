@@ -23,6 +23,7 @@ type JobContext struct {
 	BaseName        string
 	Image           string
 	ImagePullPolicy string
+	ImagePullSecret string
 	Namespace       string
 	MachineType     string
 
