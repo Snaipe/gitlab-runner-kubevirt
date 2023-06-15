@@ -26,10 +26,12 @@ type JobContext struct {
 	Namespace       string
 	MachineType     string
 
-	CPURequest    string
-	CPULimit      string
-	MemoryRequest string
-	MemoryLimit   string
+	CPURequest              string
+	CPULimit                string
+	MemoryRequest           string
+	MemoryLimit             string
+	EphemeralStorageRequest string
+	EphemeralStorageLimit   string
 }
 
 var cli struct {

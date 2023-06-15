@@ -59,6 +59,7 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 	toParse := map[k8sapi.ResourceName]pair{
 		k8sapi.ResourceCPU:              pair{jctx.CPURequest, jctx.CPULimit},
 		k8sapi.ResourceMemory:           pair{jctx.MemoryRequest, jctx.MemoryLimit},
+		k8sapi.ResourceEphemeralStorage: pair{jctx.EphemeralStorageRequest, jctx.EphemeralStorageLimit},
 	}
 
 	resources := kubevirtapi.ResourceRequirements{

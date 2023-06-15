@@ -16,12 +16,14 @@ import (
 )
 
 type PrepareCmd struct {
-	DefaultImage         string        `name:"default-image"`
-	DefaultCPURequest    string        `name:"default-cpu-request" default:"1"`
-	DefaultCPULimit      string        `name:"default-cpu-limit" default:"1"`
-	DefaultMemoryRequest string        `name:"default-memory-request" default:"1Gi"`
-	DefaultMemoryLimit   string        `name:"default-memory-limit" default:"1Gi"`
-	Timeout              time.Duration `name:"timeout" default:"1h"`
+	DefaultImage                   string        `name:"default-image"`
+	DefaultCPURequest              string        `name:"default-cpu-request" default:"1"`
+	DefaultCPULimit                string        `name:"default-cpu-limit" default:"1"`
+	DefaultMemoryRequest           string        `name:"default-memory-request" default:"1Gi"`
+	DefaultMemoryLimit             string        `name:"default-memory-limit" default:"1Gi"`
+	DefaultEphemeralStorageRequest string        `name:"default-ephemeral-storage-request" default:"1Gi"`
+	DefaultEphemeralStorageLimit   string        `name:"default-ephemeral-storage-limit" default:"1Gi"`
+	Timeout                        time.Duration `name:"timeout" default:"1h"`
 }
 
 func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) error {
@@ -36,6 +38,12 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	}
 	if jctx.MemoryLimit == "" {
 		jctx.MemoryLimit = cmd.DefaultMemoryLimit
+	}
+	if jctx.EphemeralStorageRequest == "" {
+		jctx.EphemeralStorageRequest = cmd.DefaultEphemeralStorageRequest
+	}
+	if jctx.EphemeralStorageLimit == "" {
+		jctx.EphemeralStorageLimit = cmd.DefaultEphemeralStorageLimit
 	}
 	if jctx.Image == "" {
 		jctx.Image = cmd.DefaultImage
