@@ -87,6 +87,9 @@ func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx
 			}
 			break
 		}
+		if err != nil {
+			return err
+		}
 		defer client.Close()
 
 		ext := cmd.Shell
