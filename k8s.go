@@ -53,36 +53,32 @@ func KubeClient() (kubevirt.KubevirtClient, error) {
 }
 
 func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) (*kubevirtapi.VirtualMachineInstance, error) {
-	cpuReq, err := resource.ParseQuantity(jctx.CPURequest)
-	if err != nil {
-		return nil, fmt.Errorf("parsing cpu.request: %w", err)
+	type pair struct {
+		Request, Limit string
 	}
-	cpuLim, err := resource.ParseQuantity(jctx.CPULimit)
-	if err != nil {
-		return nil, fmt.Errorf("parsing cpu.limit: %w", err)
+	toParse := map[k8sapi.ResourceName]pair{
+		k8sapi.ResourceCPU:              pair{jctx.CPURequest, jctx.CPULimit},
+		k8sapi.ResourceMemory:           pair{jctx.MemoryRequest, jctx.MemoryLimit},
 	}
-	memReq, err := resource.ParseQuantity(jctx.MemoryRequest)
-	if err != nil {
-		return nil, fmt.Errorf("parsing memory.request: %w", err)
+
+	resources := kubevirtapi.ResourceRequirements{
+		Requests: k8sapi.ResourceList{},
+		Limits:   k8sapi.ResourceList{},
 	}
-	memLim, err := resource.ParseQuantity(jctx.MemoryLimit)
-	if err != nil {
-		return nil, fmt.Errorf("parsing memory.limit: %w", err)
+	for res, e := range toParse {
+		var err error
+		resources.Requests[res], err = resource.ParseQuantity(e.Request)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s.request: %w", res, err)
+		}
+		resources.Limits[res], err = resource.ParseQuantity(e.Limit)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s.limit: %w", res, err)
+		}
 	}
 
 	if jctx.Image == "" {
 		return nil, fmt.Errorf("must specify a containerdisk image")
-	}
-
-	resources := kubevirtapi.ResourceRequirements{
-		Requests: k8sapi.ResourceList{
-			k8sapi.ResourceCPU:    cpuReq,
-			k8sapi.ResourceMemory: memReq,
-		},
-		Limits: k8sapi.ResourceList{
-			k8sapi.ResourceCPU:    cpuLim,
-			k8sapi.ResourceMemory: memLim,
-		},
 	}
 
 	instanceTemplate := kubevirtapi.VirtualMachineInstance{
