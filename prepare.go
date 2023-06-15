@@ -21,8 +21,8 @@ type PrepareCmd struct {
 	DefaultCPULimit                string        `name:"default-cpu-limit" default:"1"`
 	DefaultMemoryRequest           string        `name:"default-memory-request" default:"1Gi"`
 	DefaultMemoryLimit             string        `name:"default-memory-limit" default:"1Gi"`
-	DefaultEphemeralStorageRequest string        `name:"default-ephemeral-storage-request" default:"1Gi"`
-	DefaultEphemeralStorageLimit   string        `name:"default-ephemeral-storage-limit" default:"1Gi"`
+	DefaultEphemeralStorageRequest string        `name:"default-ephemeral-storage-request"`
+	DefaultEphemeralStorageLimit   string        `name:"default-ephemeral-storage-limit"`
 	Timeout                        time.Duration `name:"timeout" default:"1h"`
 }
 
