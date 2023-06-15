@@ -14,6 +14,7 @@ require (
 
 require (
 	barney.ci/shutil v0.1.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/coreos/prometheus-operator v0.38.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect

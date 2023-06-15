@@ -10,11 +10,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"barney.ci/shutil"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/helloyi/go-sshclient"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/text/encoding/unicode"
@@ -63,14 +66,26 @@ func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx
 			err    error
 		)
 
-		switch {
-		case cmd.SSH.PrivKey != "":
-			client, err = sshclient.DialWithKey(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.PrivKey)
-		default:
-			client, err = sshclient.DialWithPasswd(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.Password)
-		}
-		if err != nil {
-			return err
+		retryDeadline := time.Now().Add(5 * time.Minute)
+		back := backoff.NewExponentialBackOff()
+
+		for time.Now().Before(retryDeadline) {
+			switch {
+			case cmd.SSH.PrivKey != "":
+				client, err = sshclient.DialWithKey(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.PrivKey)
+			default:
+				client, err = sshclient.DialWithPasswd(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.Password)
+			}
+			var netErr *net.OpError
+			switch {
+			case errors.As(err, &netErr) && netErr.Op == "dial":
+				fmt.Fprintln(Debug, err)
+				time.Sleep(back.NextBackOff())
+				continue
+			case err != nil:
+				return err
+			}
+			break
 		}
 		defer client.Close()
 
