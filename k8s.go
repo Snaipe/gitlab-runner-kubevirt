@@ -53,28 +53,33 @@ func KubeClient() (kubevirt.KubevirtClient, error) {
 }
 
 func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) (*kubevirtapi.VirtualMachineInstance, error) {
-	type pair struct {
-		Request, Limit string
-	}
-	toParse := map[k8sapi.ResourceName]pair{
-		k8sapi.ResourceCPU:              pair{jctx.CPURequest, jctx.CPULimit},
-		k8sapi.ResourceMemory:           pair{jctx.MemoryRequest, jctx.MemoryLimit},
-		k8sapi.ResourceEphemeralStorage: pair{jctx.EphemeralStorageRequest, jctx.EphemeralStorageLimit},
-	}
 
 	resources := kubevirtapi.ResourceRequirements{
 		Requests: k8sapi.ResourceList{},
 		Limits:   k8sapi.ResourceList{},
 	}
-	for res, e := range toParse {
-		var err error
-		resources.Requests[res], err = resource.ParseQuantity(e.Request)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s.request: %w", res, err)
+
+	type entry struct {
+		List  k8sapi.ResourceList
+		Key   k8sapi.ResourceName
+		Value string
+	}
+	toParse := []entry{
+		{resources.Requests, k8sapi.ResourceCPU, jctx.CPURequest},
+		{resources.Limits, k8sapi.ResourceCPU, jctx.CPULimit},
+		{resources.Requests, k8sapi.ResourceMemory, jctx.MemoryRequest},
+		{resources.Limits, k8sapi.ResourceMemory, jctx.MemoryLimit},
+		{resources.Requests, k8sapi.ResourceEphemeralStorage, jctx.EphemeralStorageRequest},
+		{resources.Limits, k8sapi.ResourceEphemeralStorage, jctx.EphemeralStorageLimit},
+	}
+
+	for _, e := range toParse {
+		if e.Value == "" {
+			continue
 		}
-		resources.Limits[res], err = resource.ParseQuantity(e.Limit)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s.limit: %w", res, err)
+		var err error
+		if e.List[e.Key], err = resource.ParseQuantity(e.Value); err != nil {
+			return nil, fmt.Errorf("parsing %s quantity: %w", e.Key, err)
 		}
 	}
 
