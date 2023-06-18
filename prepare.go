@@ -83,7 +83,7 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 		case event := <-ch:
 			val, ok := event.Object.(*kubevirtapi.VirtualMachineInstance)
 			if !ok {
-				panic(fmt.Sprintf("unexpected object type %T", event.Object))
+				panic(fmt.Sprintf("unexpected object type %T in event type %s", event.Object, event.Type))
 			}
 			vm = val
 			if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
