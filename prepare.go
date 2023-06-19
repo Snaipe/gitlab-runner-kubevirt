@@ -71,38 +71,44 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	timeout, stop := context.WithTimeout(ctx, cmd.Timeout)
 	defer stop()
 
-	watch, err := client.VirtualMachineInstance(jctx.Namespace).Watch(ctx, *Selector(jctx))
-	if err != nil {
-		return err
-	}
-	defer watch.Stop()
-
-	ch := watch.ResultChan()
 	for {
-		select {
-		case event := <-ch:
-			val, ok := event.Object.(*kubevirtapi.VirtualMachineInstance)
-			if !ok {
-				panic(fmt.Sprintf("unexpected object type %T in event type %s", event.Object, event.Type))
-			}
-			vm = val
-			if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
-				continue
-			}
-			var ready bool
-			for _, cond := range vm.Status.Conditions {
-				if cond.Type == "Ready" && cond.Status == "True" {
-					ready = true
-					break
-				}
-			}
-			if !ready {
-				continue
-			}
-		case <-timeout.Done():
-			return timeout.Err()
+		watch, err := client.VirtualMachineInstance(jctx.Namespace).Watch(ctx, *Selector(jctx))
+		if err != nil {
+			return err
 		}
-		break
+		defer watch.Stop()
+
+		ch := watch.ResultChan()
+		for {
+			select {
+			case event, closed := <-ch:
+				// Sometimes the connection breaks and the watch instance closes
+				// the channel; can't do anything other than retry.
+				if !closed && event.Type != "" {
+					val, ok := event.Object.(*kubevirtapi.VirtualMachineInstance)
+					if !ok {
+						panic(fmt.Sprintf("unexpected object type %T in event type %s", event.Object, event.Type))
+					}
+					vm = val
+					if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
+						continue
+					}
+					var ready bool
+					for _, cond := range vm.Status.Conditions {
+						if cond.Type == "Ready" && cond.Status == "True" {
+							ready = true
+							break
+						}
+					}
+					if !ready {
+						continue
+					}
+				}
+			case <-timeout.Done():
+				return timeout.Err()
+			}
+			break
+		}
 	}
 
 	fmt.Fprintf(os.Stderr, "Virtual Machine instance %s is ready and has IP %v\n", vm.ObjectMeta.Name, vm.Status.Interfaces[0].IP)

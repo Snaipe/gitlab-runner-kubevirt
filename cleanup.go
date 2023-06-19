@@ -57,7 +57,14 @@ func (cmd *CleanupCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	ch := watch.ResultChan()
 	for {
 		select {
-		case event := <-ch:
+		case event, closed := <-ch:
+			if closed {
+				// We can't just retry like we do in prepare, because the deleted
+				// machine might have gone away in the meantime, so we'd just block
+				// forever.
+				fmt.Fprintf(os.Stderr, "Couldn't wait for Virtual Machine instance to go away, abandoning it\n")
+				return nil
+			}
 			if event.Type == "DELETED" {
 				return nil
 			}
