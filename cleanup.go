@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/watch"
+	kubevirtapi "kubevirt.io/api/core/v1"
 	kubevirt "kubevirt.io/client-go/kubecli"
 )
 
@@ -37,39 +39,28 @@ func (cmd *CleanupCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 		}
 	}
 
-	watch, err := client.VirtualMachineInstance(jctx.Namespace).Watch(ctx, *Selector(jctx))
-	if err != nil {
-		return err
-	}
-	defer watch.Stop()
-
 	fmt.Fprintf(os.Stderr, "Deleting Virtual Machine instance %v\n", vm.ObjectMeta.Name)
 
 	if err := client.VirtualMachineInstance(jctx.Namespace).Delete(ctx, vm.ObjectMeta.Name, nil); err != nil {
 		return err
 	}
 
-	// Wait for VM to go away
-
 	timeout, stop := context.WithTimeout(ctx, cmd.Timeout)
 	defer stop()
 
-	ch := watch.ResultChan()
-	for {
-		select {
-		case event, closed := <-ch:
-			if closed {
-				// We can't just retry like we do in prepare, because the deleted
-				// machine might have gone away in the meantime, so we'd just block
-				// forever.
-				fmt.Fprintf(os.Stderr, "Couldn't wait for Virtual Machine instance to go away, abandoning it\n")
-				return nil
-			}
-			if event.Type == "DELETED" {
-				return nil
-			}
-		case <-timeout.Done():
-			return timeout.Err()
+	// Wait for VM to go away
+
+	return WatchJobVM(timeout, client, jctx, vm, func(et watch.EventType, _ *kubevirtapi.VirtualMachineInstance) error {
+		switch et {
+		case watch.Error:
+			// We can't just retry like we do in prepare, because the deleted
+			// machine might have gone away in the meantime, so we'd just block
+			// forever.
+			fmt.Fprintf(os.Stderr, "Couldn't wait for Virtual Machine instance to go away, abandoning it\n")
+			return ErrWatchDone
+		case watch.Deleted:
+			return ErrWatchDone
 		}
-	}
+		return nil
+	})
 }

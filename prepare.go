@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/apimachinery/pkg/watch"
 	kubevirtapi "kubevirt.io/api/core/v1"
 	kubevirt "kubevirt.io/client-go/kubecli"
 )
@@ -71,39 +72,24 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	timeout, stop := context.WithTimeout(ctx, cmd.Timeout)
 	defer stop()
 
-outer:
-	for {
-		watch, err := client.VirtualMachineInstance(jctx.Namespace).Watch(ctx, *Selector(jctx))
-		if err != nil {
-			return err
+	err = WatchJobVM(timeout, client, jctx, vm, func(et watch.EventType, val *kubevirtapi.VirtualMachineInstance) error {
+		if et == watch.Error {
+			// Retry on watch failure
+			return nil
 		}
-		defer watch.Stop()
-
-		ch := watch.ResultChan()
-		for {
-			select {
-			case event, ok := <-ch:
-				// Sometimes the connection breaks and the watch instance closes
-				// the channel; can't do anything other than retry.
-				if ok && event.Type != "" {
-					val, ok := event.Object.(*kubevirtapi.VirtualMachineInstance)
-					if !ok {
-						panic(fmt.Sprintf("unexpected object type %T in event type %s", event.Object, event.Type))
-					}
-					vm = val
-					if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
-						continue
-					}
-					for _, cond := range vm.Status.Conditions {
-						if cond.Type == "Ready" && cond.Status == "True" {
-							break outer
-						}
-					}
-				}
-			case <-timeout.Done():
-				return timeout.Err()
+		vm = val
+		if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
+			return nil
+		}
+		for _, cond := range vm.Status.Conditions {
+			if cond.Type == "Ready" && cond.Status == "True" {
+				return ErrWatchDone
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	fmt.Fprintf(os.Stderr, "Virtual Machine instance %s is ready and has IP %v\n", vm.ObjectMeta.Name, vm.Status.Interfaces[0].IP)

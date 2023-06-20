@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	k8sapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -149,4 +151,67 @@ func FindJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobCon
 		return nil, fmt.Errorf("Virtual Machine instance has ambiguous ID! %d instances found with ID %v", len(list.Items), jctx.ID)
 	}
 	return &list.Items[0], nil
+}
+
+var ErrWatchDone = errors.New("watch done")
+
+func WatchJobVM(
+	ctx context.Context,
+	client kubevirt.KubevirtClient,
+	jctx *JobContext,
+	initial *kubevirtapi.VirtualMachineInstance,
+	fn func(watch.EventType, *kubevirtapi.VirtualMachineInstance) error,
+) error {
+	opts := Selector(jctx)
+outer:
+	for {
+		if initial != nil {
+			opts.ResourceVersion = initial.ResourceVersion
+		}
+
+		w, err := client.VirtualMachineInstance(jctx.Namespace).Watch(context.Background(), *opts)
+		if err != nil {
+			return err
+		}
+		defer w.Stop()
+
+		ch := w.ResultChan()
+		for {
+			select {
+			case event, ok := <-ch:
+				// Sometimes the connection breaks and the watch instance closes
+				// the channel; can't do anything other than retry.
+				if !ok || event.Type == "" {
+					continue outer
+				}
+				if event.Type == watch.Error {
+					status := event.Object.(*metav1.Status)
+					fmt.Fprintf(os.Stderr, "Error watching Virtual Machine instance, retrying. Reason: %s, Message: %s\n", status.Reason, status.Message)
+					// Give a chance to the watch function to respond
+					if err := fn(event.Type, nil); err != nil {
+						if err == ErrWatchDone {
+							err = nil
+						}
+						return err
+					}
+					initial.ResourceVersion = "0"
+					continue outer
+				}
+
+				val, ok := event.Object.(*kubevirtapi.VirtualMachineInstance)
+				if !ok {
+					panic(fmt.Sprintf("unexpected object type %T in event type %s", event.Object, event.Type))
+				}
+				if err := fn(event.Type, val); err != nil {
+					if err == ErrWatchDone {
+						err = nil
+					}
+					return err
+				}
+				initial = val
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 }
