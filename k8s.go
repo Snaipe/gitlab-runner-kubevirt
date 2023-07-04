@@ -99,6 +99,17 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 			Labels: map[string]string{
 				labelPrefix + "/id": jctx.ID,
 			},
+			Annotations: map[string]string{
+				// These annotations are set by the Kubernetes executor; borrow
+				// them for compatibility
+				"project.runner.gitlab.com/id":     jctx.ProjectID,
+				"job.runner.gitlab.com/id":         jctx.JobID,
+				"job.runner.gitlab.com/name":       jctx.JobName,
+				"job.runner.gitlab.com/ref":        jctx.JobRef,
+				"job.runner.gitlab.com/sha":        jctx.JobSha,
+				"job.runner.gitlab.com/before-sha": jctx.JobBeforeSha,
+				"job.runner.gitlab.com/url":        jctx.JobURL,
+			},
 		},
 		Spec: kubevirtapi.VirtualMachineInstanceSpec{
 			Domain: kubevirtapi.DomainSpec{

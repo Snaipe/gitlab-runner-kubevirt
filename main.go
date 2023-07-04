@@ -33,6 +33,14 @@ type JobContext struct {
 	MemoryLimit             string
 	EphemeralStorageRequest string
 	EphemeralStorageLimit   string
+
+	ProjectID    string
+	JobID        string
+	JobName      string
+	JobRef       string
+	JobSha       string
+	JobBeforeSha string
+	JobURL       string
 }
 
 var cli struct {
@@ -40,6 +48,11 @@ var cli struct {
 	ProjectID    string `name:"project-id" env:"CUSTOM_ENV_CI_PROJECT_ID"`
 	ConcurrentID string `name:"concurrent-id" env:"CUSTOM_ENV_CI_CONCURRENT_PROJECT_ID"`
 	JobID        string `name:"job-id" env:"CUSTOM_ENV_CI_JOB_ID"`
+	JobName      string `name:"job-name" env:"CUSTOM_ENV_CI_COMMIT_BEFORE_SHA"`
+	JobRef       string `name:"job-ref" env:"CUSTOM_ENV_CI_COMMIT_REF_NAME"`
+	JobSha       string `name:"job-sha" env:"CUSTOM_ENV_CI_COMMIT_SHA"`
+	JobBeforeSha string `name:"job-before-sha" env:"CUSTOM_ENV_CI_COMMIT_BEFORE_SHA"`
+	JobURL       string `name:"job-url" env:"CUSTOM_ENV_CI_JOB_URL"`
 	JobImage     string `name:"image" env:"CUSTOM_ENV_CI_JOB_IMAGE"`
 	Namespace    string `name:"namespace" env:"KUBEVIRT_NAMESPACE" default:"gitlab-runner"`
 	Debug        bool
@@ -80,6 +93,14 @@ func contextFromEnv() *JobContext {
 	jctx.ID = digest(sha1.New, cli.RunnerID, cli.ProjectID, cli.ConcurrentID, cli.JobID)
 	jctx.Image = cli.JobImage
 	jctx.Namespace = cli.Namespace
+
+	jctx.ProjectID = cli.ProjectID
+	jctx.JobID = cli.JobID
+	jctx.JobName = cli.JobName
+	jctx.JobRef = cli.JobRef
+	jctx.JobSha = cli.JobSha
+	jctx.JobBeforeSha = cli.JobBeforeSha
+	jctx.JobURL = cli.JobURL
 	return &jctx
 }
 
