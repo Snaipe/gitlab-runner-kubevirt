@@ -105,6 +105,17 @@ func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx
 			return err
 		}
 
+		if cli.Debug {
+			contents, err := os.ReadFile(cmd.Script)
+			fmt.Fprintf(Debug, "contents of %v:\n", cmd.Script)
+			if err == nil {
+				Debug.Write(contents)
+			} else {
+				fmt.Fprintf(Debug, "<ERROR: %v>", err)
+			}
+			fmt.Fprintf(Debug, "---\n", cmd.Script)
+		}
+
 		argv := generateShellArgv(cmd.Shell, scriptPath)
 
 		fmt.Fprintf(Debug, "executing %v\n", argv)
