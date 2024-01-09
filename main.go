@@ -33,6 +33,7 @@ type JobContext struct {
 	MemoryLimit             string
 	EphemeralStorageRequest string
 	EphemeralStorageLimit   string
+	Timezone                string
 
 	ProjectID    string
 	JobID        string

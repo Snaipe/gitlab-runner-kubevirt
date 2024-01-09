@@ -26,6 +26,7 @@ type PrepareCmd struct {
 	DefaultMemoryLimit             string        `name:"default-memory-limit" default:"1Gi"`
 	DefaultEphemeralStorageRequest string        `name:"default-ephemeral-storage-request"`
 	DefaultEphemeralStorageLimit   string        `name:"default-ephemeral-storage-limit"`
+	DefaultTimezone                string        `name:"default-timezone" default:"Etc/UTC" env:"CUSTOM_ENV_VM_TIMEZONE"`
 	Timeout                        time.Duration `name:"timeout" default:"1h"`
 }
 
@@ -56,6 +57,9 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	}
 	if jctx.Image == "" {
 		jctx.Image = cmd.DefaultImage
+	}
+	if jctx.Timezone == "" {
+		jctx.Timezone = cmd.DefaultTimezone
 	}
 
 	fmt.Fprintf(os.Stderr, "Creating Virtual Machine instance\n")

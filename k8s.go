@@ -89,6 +89,8 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 		return nil, fmt.Errorf("must specify a containerdisk image")
 	}
 
+	timezone := kubevirtapi.ClockOffsetTimezone(jctx.Timezone)
+
 	instanceTemplate := kubevirtapi.VirtualMachineInstance{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: kubevirtapi.GroupVersion.String(),
@@ -121,6 +123,17 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 					Disks: []kubevirtapi.Disk{
 						{
 							Name: "root",
+						},
+					},
+				},
+				Clock: &kubevirtapi.Clock{
+					ClockOffset: kubevirtapi.ClockOffset{
+						Timezone: &timezone,
+					},
+					Timer: &kubevirtapi.Timer{
+						Hyperv: &kubevirtapi.HypervTimer{},
+						RTC: &kubevirtapi.RTCTimer{
+							TickPolicy: kubevirtapi.RTCTickPolicy("catchup"),
 						},
 					},
 				},
