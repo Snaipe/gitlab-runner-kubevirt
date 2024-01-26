@@ -98,6 +98,7 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 
 	fmt.Fprintln(os.Stderr, "Virtual Machine instance is ready.")
 	fmt.Fprintln(os.Stderr, "Name:", vm.ObjectMeta.Name)
+	fmt.Fprintln(os.Stderr, "Image:", jctx.Image)
 	fmt.Fprintln(os.Stderr, "Node:", vm.Status.NodeName)
 	fmt.Fprintln(os.Stderr, "IP:", vm.Status.Interfaces[0].IP)
 	return nil
