@@ -28,6 +28,9 @@ type PrepareCmd struct {
 	DefaultEphemeralStorageLimit   string        `name:"default-ephemeral-storage-limit"`
 	DefaultTimezone                string        `name:"default-timezone" default:"Etc/UTC" env:"CUSTOM_ENV_VM_TIMEZONE"`
 	Timeout                        time.Duration `name:"timeout" default:"1h"`
+	DialTimeout                    time.Duration `default:"10s"`
+
+	RunConfig `embed`
 }
 
 func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) error {
@@ -62,9 +65,11 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 		jctx.Timezone = cmd.DefaultTimezone
 	}
 
+	rc := cmd.RunConfig
+
 	fmt.Fprintf(os.Stderr, "Creating Virtual Machine instance\n")
 
-	vm, err := CreateJobVM(ctx, client, jctx)
+	vm, err := CreateJobVM(ctx, client, jctx, &rc)
 	if err != nil {
 		return err
 	}
@@ -101,5 +106,13 @@ func (cmd *PrepareCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 	fmt.Fprintln(os.Stderr, "Image:", jctx.Image)
 	fmt.Fprintln(os.Stderr, "Node:", vm.Status.NodeName)
 	fmt.Fprintln(os.Stderr, "IP:", vm.Status.Interfaces[0].IP)
+
+	fmt.Fprintln(os.Stderr, "Waiting for virtual machine to become reachable via ssh...")
+
+	ssh, err := DialSSH(timeout, vm.Status.Interfaces[0].IP, rc.SSH, cmd.DialTimeout)
+	if err != nil {
+		return err
+	}
+	_ = ssh.Close()
 	return nil
 }

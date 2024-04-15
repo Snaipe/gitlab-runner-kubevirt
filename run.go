@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -24,76 +25,62 @@ import (
 	kubevirt "kubevirt.io/client-go/kubecli"
 )
 
+type SSHConfig struct {
+	Port     string `name:"port" default:"22" help:"Port to ssh to"`
+	User     string `name:"user" help:"ssh username"`
+	Password string `name:"password" xor:"auth" help:"ssh password"`
+	PrivKey  string `name:"private-key-file" xor:"auth" help:"ssh private key"`
+}
+
+type RunConfig struct {
+	Shell  string    `name:"shell" required enum:"bash,pwsh" help:"shell to use when executing script"`
+	Method string    `name:"method" default:"ssh" enum:"ssh" help:"method to execute script"`
+	SSH    SSHConfig `embed prefix:"ssh-" group:"SSH method options:"`
+}
+
+const RunConfigKey = labelPrefix + "/runconfig"
+
 type RunCmd struct {
-	Shell  string `name:"shell" required enum:"bash,pwsh" help:"shell to use when executing script"`
-	Method string `name:"method" default:"ssh" enum:"ssh" help:"method to execute script"`
-
-	SSH struct {
-		IP       string `name:"ip" help:"IP to ssh to (for debugging)"`
-		Port     string `name:"port" default:"22" help:"Port to ssh to"`
-		User     string `name:"user" help:"ssh username"`
-		Password string `name:"password" xor:"auth" help:"ssh password"`
-		PrivKey  string `name:"private-key-file" xor:"auth" help:"ssh private key"`
-	} `embed prefix:"ssh-" group:"SSH method options:"`
-
 	Script string `arg`
 	Stage  string `arg`
+
+	RetryTimeout time.Duration `default:"5m"`
+	DialTimeout  time.Duration `default:"10s"`
 }
 
 func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) error {
 
-	switch cmd.Method {
+	vm, err := FindJobVM(ctx, client, jctx)
+	if err != nil {
+		return err
+	}
+
+	var rc RunConfig
+	if err := json.Unmarshal([]byte(vm.Annotations[RunConfigKey]), &rc); err != nil {
+		return err
+	}
+
+	if vm.Status.Phase != "Running" {
+		return fmt.Errorf("Virtual Machine instance %s is not running (phase: %v)", vm.ObjectMeta.Name, vm.Status.Phase)
+	}
+	if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
+		return fmt.Errorf("Virtual Machine instance %s has no IP; is it running?", vm.ObjectMeta.Name)
+	}
+	ip := vm.Status.Interfaces[0].IP
+
+	timeout, stop := context.WithTimeout(ctx, cmd.RetryTimeout)
+	defer stop()
+
+	switch rc.Method {
 	case "ssh":
-
-		ip := cmd.SSH.IP
-		if ip == "" {
-			vm, err := FindJobVM(ctx, client, jctx)
-			if err != nil {
-				return err
-			}
-
-			if vm.Status.Phase != "Running" {
-				return fmt.Errorf("Virtual Machine instance %s is not running (phase: %v)", vm.ObjectMeta.Name, vm.Status.Phase)
-			}
-			if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
-				return fmt.Errorf("Virtual Machine instance %s has no IP; is it running?", vm.ObjectMeta.Name)
-			}
-			ip = vm.Status.Interfaces[0].IP
-		}
-
-		var (
-			client *sshclient.Client
-			err    error
-		)
-
-		retryDeadline := time.Now().Add(5 * time.Minute)
-		back := backoff.NewExponentialBackOff()
-
-		for time.Now().Before(retryDeadline) {
-			switch {
-			case cmd.SSH.PrivKey != "":
-				client, err = sshclient.DialWithKey(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.PrivKey)
-			default:
-				client, err = sshclient.DialWithPasswd(ip+":"+cmd.SSH.Port, cmd.SSH.User, cmd.SSH.Password)
-			}
-			var netErr *net.OpError
-			switch {
-			case errors.As(err, &netErr) && netErr.Op == "dial":
-				fmt.Fprintln(Debug, err)
-				time.Sleep(back.NextBackOff())
-				continue
-			case err != nil:
-				return err
-			}
-			break
-		}
+		client, err := DialSSH(timeout, ip, rc.SSH, cmd.DialTimeout)
 		if err != nil {
 			return err
 		}
 		defer client.Close()
 
-		ext := cmd.Shell
-		switch cmd.Shell {
+		ext := rc.Shell
+		switch rc.Shell {
 		case "pwsh":
 			ext = "ps1"
 		}
@@ -116,7 +103,7 @@ func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx
 			fmt.Fprintf(Debug, "---\n", cmd.Script)
 		}
 
-		argv := generateShellArgv(cmd.Shell, scriptPath)
+		argv := generateShellArgv(rc.Shell, scriptPath)
 
 		fmt.Fprintf(Debug, "executing %v\n", argv)
 		if err := client.Cmd(shutil.Quote(argv)).SetStdio(os.Stdout, os.Stderr).Run(); err != nil {
@@ -173,5 +160,54 @@ func generateShellArgv(shell, script string) []string {
 		}
 	default:
 		panic("unsupported shell")
+	}
+}
+
+func DialSSH(ctx context.Context, ip string, config SSHConfig, dialTimeout time.Duration) (client *sshclient.Client, err error) {
+
+	back := backoff.NewExponentialBackOff()
+	back.MaxInterval = 5 * time.Second
+
+	for {
+		fmt.Fprintf(Debug, "attempting to connect to %s:%s...\n", ip, config.Port)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		sshconfig := ssh.ClientConfig{
+			User:            config.User,
+			Timeout:         dialTimeout,
+			HostKeyCallback: ssh.HostKeyCallback(func(hostname string, remote net.Addr, key ssh.PublicKey) error { return nil }),
+		}
+
+		if config.PrivKey != "" {
+			key, err := os.ReadFile(config.PrivKey)
+			if err != nil {
+				return nil, err
+			}
+
+			signer, err := ssh.ParsePrivateKey(key)
+			if err != nil {
+				return nil, err
+			}
+
+			sshconfig.Auth = append(sshconfig.Auth, ssh.PublicKeys(signer))
+		}
+
+		sshconfig.Auth = append(sshconfig.Auth, ssh.Password(config.Password))
+
+		client, err = sshclient.Dial("tcp", ip+":"+config.Port, &sshconfig)
+		var netErr *net.OpError
+		switch {
+		case errors.As(err, &netErr) && netErr.Op == "dial":
+			fmt.Fprintln(Debug, err)
+			time.Sleep(back.NextBackOff())
+			continue
+		case err != nil:
+			return nil, err
+		}
+		return client, nil
 	}
 }

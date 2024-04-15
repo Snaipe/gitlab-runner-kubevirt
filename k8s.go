@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -54,7 +55,12 @@ func KubeClient() (kubevirt.KubevirtClient, error) {
 	return kubevirt.GetKubevirtClientFromRESTConfig(cfg)
 }
 
-func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) (*kubevirtapi.VirtualMachineInstance, error) {
+func CreateJobVM(
+	ctx context.Context,
+	client kubevirt.KubevirtClient,
+	jctx *JobContext,
+	rc *RunConfig,
+) (*kubevirtapi.VirtualMachineInstance, error) {
 
 	resources := kubevirtapi.ResourceRequirements{
 		Requests: k8sapi.ResourceList{},
@@ -89,6 +95,11 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 		return nil, fmt.Errorf("must specify a containerdisk image")
 	}
 
+	runConfigJSON, err := json.Marshal(rc)
+	if err != nil {
+		return nil, err
+	}
+
 	timezone := kubevirtapi.ClockOffsetTimezone(jctx.Timezone)
 
 	instanceTemplate := kubevirtapi.VirtualMachineInstance{
@@ -111,6 +122,9 @@ func CreateJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobC
 				"job.runner.gitlab.com/sha":        jctx.JobSha,
 				"job.runner.gitlab.com/before-sha": jctx.JobBeforeSha,
 				"job.runner.gitlab.com/url":        jctx.JobURL,
+
+				// These are owned by this runner.
+				RunConfigKey: string(runConfigJSON),
 			},
 		},
 		Spec: kubevirtapi.VirtualMachineInstanceSpec{
