@@ -14,4 +14,6 @@ RUN --mount=target=. \
 
 FROM gitlab/gitlab-runner:alpine-${GITLAB_RUNNER_VERSION}
 
+RUN apk upgrade ca-certificates
+
 COPY --from=build /out/gitlab-runner-kubevirt /bin/gitlab-runner-kubevirt
