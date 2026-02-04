@@ -57,7 +57,7 @@ jobs:
           context: .
           build-args: |
             VERSION=${{ steps.version.outputs.VERSION }}
-            GITLAB_RUNNER_VERSION=v17.0.1
+            GITLAB_RUNNER_VERSION=v17.7.1
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

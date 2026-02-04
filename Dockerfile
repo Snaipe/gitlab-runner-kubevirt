@@ -1,6 +1,6 @@
-ARG GITLAB_RUNNER_VERSION=v17.0.1
+ARG GITLAB_RUNNER_VERSION=v17.7.1
 
-FROM golang:1.20-alpine AS build
+FROM golang:1.24-alpine AS build
 
 WORKDIR /src
 

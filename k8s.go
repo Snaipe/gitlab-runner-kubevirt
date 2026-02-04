@@ -167,7 +167,9 @@ func CreateJobVM(
 		},
 	}
 
-	return client.VirtualMachineInstance(jctx.Namespace).Create(ctx, &instanceTemplate)
+	createOptions := &metav1.CreateOptions{}
+
+	return client.VirtualMachineInstance(jctx.Namespace).Create(ctx, &instanceTemplate, *createOptions)
 }
 
 func Selector(jctx *JobContext) *metav1.ListOptions {
@@ -177,7 +179,7 @@ func Selector(jctx *JobContext) *metav1.ListOptions {
 }
 
 func FindJobVM(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) (*kubevirtapi.VirtualMachineInstance, error) {
-	list, err := client.VirtualMachineInstance(jctx.Namespace).List(ctx, Selector(jctx))
+	list, err := client.VirtualMachineInstance(jctx.Namespace).List(ctx, *Selector(jctx))
 	if err != nil {
 		return nil, err
 	}

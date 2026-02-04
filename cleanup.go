@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	kubevirtapi "kubevirt.io/api/core/v1"
 	kubevirt "kubevirt.io/client-go/kubecli"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type CleanupCmd struct {
@@ -25,7 +27,12 @@ type CleanupCmd struct {
 func (cmd *CleanupCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx *JobContext) error {
 	vm, err := FindJobVM(ctx, client, jctx)
 	if err != nil {
-		return err
+		if !strings.Contains(err.Error(), "Virtual Machine instance disappeared while the job was running!") {
+			return fmt.Errorf("cleanup error: %w", err) // Return the error only if it's NOT the specific "VM disappeared" error
+		}
+
+		fmt.Fprintf(os.Stderr, "Skipping cleanup of Virtual Machine instance because none were found\n")
+		return nil
 	}
 
 	for _, skipIf := range cmd.SkipIf {
@@ -41,7 +48,9 @@ func (cmd *CleanupCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, 
 
 	fmt.Fprintf(os.Stderr, "Deleting Virtual Machine instance %v\n", vm.ObjectMeta.Name)
 
-	if err := client.VirtualMachineInstance(jctx.Namespace).Delete(ctx, vm.ObjectMeta.Name, nil); err != nil {
+	deleteOptions := &metav1.DeleteOptions{}
+
+	if err := client.VirtualMachineInstance(jctx.Namespace).Delete(ctx, vm.ObjectMeta.Name, *deleteOptions); err != nil {
 		return err
 	}
 

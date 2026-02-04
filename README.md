@@ -22,12 +22,12 @@ executor = "custom"
   prepare_exec = "/bin/gitlab-runner-kubevirt"
   prepare_args = [
     "prepare",
+    "--shell", "bash",
     <prepare config flags ...>
   ]
   run_exec = "/bin/gitlab-runner-kubevirt"
   run_args = [
     "run",
-    "--shell", "bash",
     <run config flags ...>
   ]
   cleanup_exec = "/bin/gitlab-runner-kubevirt"
@@ -55,9 +55,9 @@ runners:
       config_exec = "/bin/gitlab-runner-kubevirt"
       config_args = ["config"]
       prepare_exec = "/bin/gitlab-runner-kubevirt"
-      prepare_args = ["prepare"]
+      prepare_args = ["prepare", "--shell", "bash"]
       run_exec = "/bin/gitlab-runner-kubevirt"
-      run_args = ["run", "--shell", "bash"]
+      run_args = ["run"]
       cleanup_exec = "/bin/gitlab-runner-kubevirt"
       cleanup_args = ["cleanup"]
 ```
@@ -79,6 +79,7 @@ shell = "pwsh"
   prepare_args = [
     "prepare",
     "--debug",
+    "--shell", "pwsh",
     "--default-image", "gitlab-registry.example.com:5050/ci/windows:v0.0.1"
     "--default-memory-request", "4G",
     "--default-memory-limit", "4G",
@@ -92,7 +93,6 @@ shell = "pwsh"
   run_exec = "/bin/gitlab-runner-kubevirt"
   run_args = [
     "run",
-    "--shell", "pwsh",
     "--ssh-user", "vagrant",
     "--ssh-password", "vagrant",
   ]

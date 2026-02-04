@@ -63,13 +63,34 @@ func (cmd *RunCmd) Run(ctx context.Context, client kubevirt.KubevirtClient, jctx
 	if vm.Status.Phase != "Running" {
 		return fmt.Errorf("Virtual Machine instance %s is not running (phase: %v)", vm.ObjectMeta.Name, vm.Status.Phase)
 	}
-	if len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
-		return fmt.Errorf("Virtual Machine instance %s has no IP; is it running?", vm.ObjectMeta.Name)
-	}
-	ip := vm.Status.Interfaces[0].IP
 
+	// Wait for VM to have an IP (handles guest agent transition)
 	timeout, stop := context.WithTimeout(ctx, cmd.RetryTimeout)
 	defer stop()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	fmt.Fprintf(Debug, "Waiting for Virtual Machine instance %s to have an IP address...\n", vm.ObjectMeta.Name)
+
+	for len(vm.Status.Interfaces) == 0 || vm.Status.Interfaces[0].IP == "" {
+		select {
+		case <-timeout.Done():
+			return fmt.Errorf("Virtual Machine instance %s has no IP after timeout; is it running?", vm.ObjectMeta.Name)
+		case <-ticker.C:
+			vm, err = FindJobVM(timeout, client, jctx)
+			if err != nil {
+				return err
+			}
+			if len(vm.Status.Interfaces) > 0 && vm.Status.Interfaces[0].IP != "" {
+				break
+			}
+			fmt.Fprintf(Debug, "VM %s still has no IP, retrying...\n", vm.ObjectMeta.Name)
+		}
+	}
+
+	ip := vm.Status.Interfaces[0].IP
+	fmt.Fprintf(Debug, "Virtual Machine instance has IP: %s\n", ip)
 
 	switch rc.Method {
 	case "ssh":
